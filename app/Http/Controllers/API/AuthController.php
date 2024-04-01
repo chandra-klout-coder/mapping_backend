@@ -594,7 +594,7 @@ class AuthController extends Controller
 
         return response()->json([
             'status' => 200,
-            'message' => 'API Working'
+            'message' => 'Klout Mapping Application API Working.'
         ]);
     }
 
