@@ -150,6 +150,36 @@ class MappingModuleController extends Controller
         }
     }
 
+    //Remove selected industries 
+    public function removeSelectedIndustriesData(Request $request)
+    {
+        $removeDataIds = $request->input('remove_data_id');
+
+        if (isset($removeDataIds) && !empty($removeDataIds)) {
+
+            foreach ($removeDataIds as $row) {
+
+                $record = UnassignedData::find($row);
+
+                if ($record) {
+                    $record->delete();
+                }
+            }
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Industries Removed Successfully.'
+            ]);
+        } else {
+            return response()->json(
+                [
+                    'status' => 400,
+                    'message' => 'Incorrect Data.'
+                ]
+            );
+        }
+    }
+
     //Assign Industry Data.
     public function assignedIndustriesData(Request $request)
     {
@@ -161,10 +191,17 @@ class MappingModuleController extends Controller
 
         if (isset($assignData) && !empty($assignData)) {
             foreach ($assignData as $row) {
-                Industry::create([
-                    'name' => $row,
-                    'parent_id' => $industry_id
-                ]);
+                if (!empty($industry_id)) {
+                    Industry::create([
+                        'name' => $row,
+                        'parent_id' => $industry_id
+                    ]);
+                } else {
+                    Industry::create([
+                        'name' => $row,
+                        'parent_id' => 0
+                    ]);
+                }
             }
 
             foreach ($assignDataIds as $row) {
@@ -191,6 +228,39 @@ class MappingModuleController extends Controller
     }
 
 
+
+    //Remove selected companies
+    public function removeSelectedCompaniesData(Request $request)
+    {
+        $removeDataIds = $request->input('remove_data_id');
+
+        if (isset($removeDataIds) && !empty($removeDataIds)) {
+
+            foreach ($removeDataIds as $row) {
+
+                $record = UnassignedData::find($row);
+
+                if ($record) {
+                    $record->delete();
+                }
+            }
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Companies Removed Successfully.'
+            ]);
+        } else {
+            return response()->json(
+                [
+                    'status' => 400,
+                    'message' => 'Incorrect Data.'
+                ]
+            );
+        }
+    }
+
+
+
     //Assign Company Data.
     public function assignedCompaniesData(Request $request)
     {
@@ -201,11 +271,19 @@ class MappingModuleController extends Controller
         $company_id = $request->input('company_id');
 
         if (isset($assignData) && !empty($assignData)) {
+
             foreach ($assignData as $row) {
-                Company::create([
-                    'name' => $row,
-                    'parent_id' => $company_id
-                ]);
+                if (!empty($company_id)) {
+                    Company::create([
+                        'name' => $row,
+                        'parent_id' => $company_id
+                    ]);
+                } else {
+                    Company::create([
+                        'name' => $row,
+                        'parent_id' => 0
+                    ]);
+                }
             }
 
             foreach ($assignDataIds as $row) {
@@ -232,6 +310,36 @@ class MappingModuleController extends Controller
     }
 
 
+    //Remove selected job-titles
+    public function removeSelectedJobTitlesData(Request $request)
+    {
+        $removeDataIds = $request->input('remove_data_id');
+
+        if (isset($removeDataIds) && !empty($removeDataIds)) {
+
+            foreach ($removeDataIds as $row) {
+
+                $record = UnassignedData::find($row);
+
+                if ($record) {
+                    $record->delete();
+                }
+            }
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Job-Titles Removed Successfully.'
+            ]);
+        } else {
+            return response()->json(
+                [
+                    'status' => 400,
+                    'message' => 'Incorrect Data.'
+                ]
+            );
+        }
+    }
+
     //Assign Job Title Data.
     public function assignedJobTitlesData(Request $request)
     {
@@ -242,11 +350,19 @@ class MappingModuleController extends Controller
         $job_title_id = $request->input('job_title_id');
 
         if (isset($assignData) && !empty($assignData)) {
+
             foreach ($assignData as $row) {
-                JobTitle::create([
-                    'name' => $row,
-                    'parent_id' => $job_title_id
-                ]);
+                if (!empty($job_title_id)) {
+                    JobTitle::create([
+                        'name' => $row,
+                        'parent_id' => $job_title_id
+                    ]);
+                } else {
+                    JobTitle::create([
+                        'name' => $row,
+                        'parent_id' => 0
+                    ]);
+                }
             }
 
             foreach ($assignDataIds as $row) {

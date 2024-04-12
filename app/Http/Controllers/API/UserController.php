@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use App\Models\PersonalAccessToken as ModelsPersonalAccessToken;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Services\SmsServices;
 use App\Services\EmailService;
 
+use Laravel\Sanctum\PersonalAccessToken;
 use Ramsey\Uuid\Uuid;
 
 class UserController extends Controller
@@ -26,17 +28,33 @@ class UserController extends Controller
     }
 
     //Auth - Get User Details
-    public function profile()
+    public function profile(Request $request)
     {
-        $user = Auth::user();
+        // $user = Auth::user();
 
-        if ($user) {
+        // $user = $request->header('Authorization');
+
+        $tokenString = $request->bearerToken();
+
+        $tokenParts = explode('|', $tokenString);
+
+        // Extract the hashed token id
+        $token = $tokenParts[0];
+
+        $data = PersonalAccessToken::where('id', $token)->first();
+
+        if ($data) {
+
+            $email = explode('_Token', $data->name);
+
+            $user = User::where('email', $email[0])->first();
 
             //Return user profile
             return response()->json([
                 'status' => 200,
                 'message' => 'User-Profile Details',
-                'user' => $user
+                'token' => $tokenString,
+                'user' => $user,
             ]);
         }
     }
@@ -44,8 +62,6 @@ class UserController extends Controller
     //update profile
     public function updateprofile(Request $request)
     {
-        $user = Auth::user();
-
         $validator = Validator::make($request->all(), [
             'first_name' => 'required | string | max:200',
             'last_name' => 'string | max:200',
@@ -81,8 +97,22 @@ class UserController extends Controller
             ]);
         } else {
 
+            $tokenString = $request->bearerToken();
+
+            $tokenParts = explode('|', $tokenString);
+
+            // Extract the hashed token id
+            $token = $tokenParts[0];
+
+            $data = PersonalAccessToken::where('id', $token)->first();
+
+            $email = explode('_Token', $data->name);
+
+            $user = User::where('email', $email[0])->first();
+
             // Update the authenticated user's profile
-            $user = Auth::user();
+            // $user = Auth::user();
+
             $user->first_name = $request->input('first_name');
             $user->last_name = $request->input('last_name');
             $user->mobile_number = $request->input('mobile_number');
@@ -132,7 +162,19 @@ class UserController extends Controller
             ]);
         }
 
-        $user = Auth::user();
+        // $user = Auth::user();
+        $tokenString = $request->bearerToken();
+
+        $tokenParts = explode('|', $tokenString);
+
+        // Extract the hashed token id
+        $token = $tokenParts[0];
+
+        $data = PersonalAccessToken::where('id', $token)->first();
+
+        $email = explode('_Token', $data->name);
+
+        $user = User::where('email', $email[0])->first();
 
         if (Hash::check($request->input('password'), $user->password)) {
             return response()->json(

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Models\Name;
+use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Models\City;
 use App\Models\State;
@@ -19,10 +20,13 @@ use App\Models\IndustryData;
 use App\Models\JobTitleData;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+
 use App\Services\SmsServices;
 use App\Models\PasswordReset;
 use App\Services\EmailService;
+
 use App\Mail\ResetPasswordMail;
+
 use App\Models\ContactMessage;
 use App\Models\WebsiteSetting;
 use App\Models\SponsorshipPackages;
@@ -632,14 +636,12 @@ class AuthController extends Controller
             $mobile_otp = rand(100000, 999999);
             $email_otp = rand(100000, 999999);
 
-            // For Demo purpose 
-            // $email_otp = '123456';
-            // $mobile_otp = '123456';
-
             $email = $request->email;
             $mobile_number = $request->mobile_number;
 
-            UserOtp::where('email', $email)->delete();
+            UserOtp::where('email', $email)
+                ->orWhere('mobile', $mobile_number)
+                ->delete();
 
             UserOtp::create([
                 'email' => $email,
@@ -648,16 +650,29 @@ class AuthController extends Controller
                 'mobile_otp'  => $mobile_otp
             ]);
 
-            $this->smsService->sendSMS('+91' . $mobile_number, 'Your OTP is : ' . $mobile_otp);
+            $mobile_otp_send = $this->send_local_text_sms(
+                $mobile_number,
+                $mobile_otp
+            );
+
+            // Twillio 
+            // $this->smsService->sendSMS('+91' . $mobile_number, 'Your OTP is : ' . $mobile_otp);
 
             $email_message = 'Your OTP is : ' . $email_otp;
 
             $this->emailService->sendRegistrationEmail($email, 'Klout: OTP Verification', $email_message);
 
-            return response()->json([
-                'status' => 200,
-                'message' => 'OTP Send to Mobile Number and Email.'
-            ]);
+            if ($mobile_otp_send) {
+                return response()->json([
+                    'status' => 200,
+                    'message' => 'Send OTP to Mobile Number and Email.'
+                ]);
+            } else {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Something Went Wrong. Please try again later.'
+                ]);
+            }
         } elseif ($request->step === '2') {
 
             $email = $request->email;
@@ -667,7 +682,6 @@ class AuthController extends Controller
             $email_verify = UserOtp::where('email', $email)->first();
 
             if (!empty($mobile_verify) && !empty($mobile_verify)) {
-
 
                 if (($mobile_verify->mobile_otp !== trim($request->mobile_otp))) {
                     return response()->json([
@@ -702,19 +716,25 @@ class AuthController extends Controller
                         'notifications' => (!empty($request->notifications) && $request->notifications === "on")  ? "1" : "0"
                     ]);
 
-                    $registration_success_message = "Congratulations ! Your registration is Completed on Klout Club.";
+                    if ($user) {
 
-                    $this->smsService->sendSMS('+91' . $mobile, $registration_success_message);
+                        $registration_success_message = "Congratulations! Your registration is Completed on Klout Club.";
 
-                    $this->emailService->sendRegistrationEmail($email, 'Klout : Registration Successfully', $registration_success_message);
+                        $this->emailService->sendRegistrationEmail($email, 'Klout : Registration Successfully', $registration_success_message);
 
-                    $delete_otp_record = UserOtp::where('email', $email)->delete();
+                        $delete_otp_record = UserOtp::where('email', $email)->delete();
 
-                    if ($delete_otp_record) {
-                        return response()->json([
-                            'status' => 200,
-                            'message' => 'OTP Verified Successfully'
-                        ]);
+                        if ($delete_otp_record) {
+                            return response()->json([
+                                'status' => 200,
+                                'message' => 'OTP Verified and User Register Successfully.'
+                            ]);
+                        } else {
+                            return response()->json([
+                                'status' => 400,
+                                'message' => 'Something Went Wrong. Please try again later.'
+                            ]);
+                        }
                     }
                 } else {
                     return response()->json([
@@ -728,13 +748,48 @@ class AuthController extends Controller
                     'message' => 'Invalid OTP.Please try again.'
                 ]);
             }
+        } else {
+            return response()->json([
+                'status' => 200,
+                'message' => 'Invalid parameters and try again.'
+            ]);
         }
+    }
 
+    //Send SMS via Local Text API - Single SMS
+    public function send_local_text_sms($mobile_number, $otp)
+    {
+        $apiKey = urlencode(Config('app.textlocal_api_key'));
 
-        return response()->json([
-            'status' => 200,
-            'message' => 'Invalid paramters and try again.'
-        ]);
+        $numbers = array($mobile_number);
+
+        $sender = urlencode(Config('app.textlocal_sender'));
+
+        $content = $otp . " is your OTP for verifying your profile with KloutClub by Insightner Marketing Services";
+
+        $message = rawurlencode($content);
+
+        $numbers = implode(',', $numbers);
+
+        $data = array('apikey' => $apiKey, 'numbers' => $numbers, "sender" => $sender, "message" => $message);
+
+        $ch = curl_init('https://api.textlocal.in/send/');
+
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($ch);
+
+        curl_close($ch);
+
+        $responseData = json_decode($response, true);
+
+        if ($responseData['status'] === "success") {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     //User-Login
@@ -779,44 +834,66 @@ class AuthController extends Controller
         }
     }
 
-    //Auth - Logout 
-    public function logout()
+
+    //Check Authentication
+    public function checkingAuthenticated(Request $request)
     {
-        $user = Auth::user();
+        // $user = Auth::user();
 
-        if ($user) {
+        $user = $request->header('Authorization');
 
-            $user->tokens()->delete();
+        $token = $request->bearerToken();
+
+        if ($token) {
 
             return response()->json([
                 'status' => 200,
-                'message' => 'You have successfully logged out.'
+                'message' => 'You are in Klout Club Application.'
             ]);
-        }
-
-        return response()->json(['message' => 'User not authenticated.'], 401);
-    }
-
-    //Auth - Forgot Password Link 
-    public function forgotPassword(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:users,email',
-        ]);
-
-        if ($validator->fails()) {
-
-            $errors = $validator->errors();
-
+            
+        } else {
             return response()->json([
                 'status' => 422,
-                'message' => 'Email is not registered.',
-                'error' => $errors->first(),
+                'message' => 'Redirect to Login Page.'
             ]);
+        }
+    }
+
+    //Auth - Logout 
+    public function logout(Request $request)
+    {
+        // $user = Auth::user();
+
+        $tokenString = $request->bearerToken();
+
+        if ($tokenString) {
+            $tokenParts = explode('|', $tokenString);
+
+            // Extract the hashed token id
+            $token = $tokenParts[0];
+
+            $data = PersonalAccessToken::where('id', $token)->delete();
+
+            if ($data) {
+
+                // $user->tokens()->delete();
+
+                return response()->json([
+                    'status' => 200,
+                    'message' => 'You have successfully logged out.'
+                ]);
+            }
         } else {
+            return response()->json(['message' => 'User not authenticated.'], 401);
+        }
+    }
 
-            $email = $request->input('email');
+    //Auth - Reset Password Link 
+    public function forgotPassword(Request $request)
+    {
+        $email = $request->input('email');
 
+        if (!empty($email)) {
             $user = User::where('email', $email)->first();
 
             if ($user) {
@@ -837,14 +914,6 @@ class AuthController extends Controller
                 // Send the password reset link via email
                 $resetLink  = Config('app.front_end_url') . '/reset-password?email=' . $email . '&token=' . $token;
 
-                $this->smsService->sendSMS('+91' . $user->mobile_number, 'Dear User, 
-                Thank you for your request to change your password.Please click link to enter your new password :
-             ' . $resetLink . '
-             If you have not requested to change password, then ignore this message.
-             
-             Kind regards,
-             Klout Club');
-
                 Mail::to($email)->send(new ResetPasswordMail($resetLink));
 
                 return response()->json(
@@ -864,7 +933,7 @@ class AuthController extends Controller
         }
     }
 
-    //Reset Password 
+    //Reset assword with Token 
     public function resetPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -921,10 +990,9 @@ class AuthController extends Controller
             $user->password = Hash::make($password);
             $user->save();
 
-            // Delete the password reset entry from the table
+            // Delete the password reset token 
             PasswordReset::where('email', $email)->delete();
 
-            //send mail and sms
             $changed_password_success_message = "Congratulations ! Password Changed Successfully.";
 
             $this->emailService->sendChangedPasswordEmail($email, 'Klout : Password Changed', $changed_password_success_message);

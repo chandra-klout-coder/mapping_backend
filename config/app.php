@@ -13,11 +13,13 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'klout-club'),
+    'name' => env('APP_NAME', 'klout-mapaping-app'),
 
     'twilio_sid' => env('TWILIO_SID'),
     'twilio_auth_token' =>env('TWILIO_AUTH_TOKEN'),
     'twilio_phone_number' =>env('TWILIO_PHONE_NUMBER'),
+    'textlocal_api_key' => env('TEXTLOCAL_API_KEY'),
+    'textlocal_sender' => env('TEXTLOCAL_SENDER'),
     
     'front_end_url' =>env('FRONT_END_URL'),
     /*

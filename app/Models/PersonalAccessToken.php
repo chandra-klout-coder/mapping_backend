@@ -5,15 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class UserOtp extends Model
+class PersonalAccessToken extends Model
 {
     use HasFactory;
 
-        protected $table = 'user_otps'; 
-    
+    protected $table = 'personal_access_tokens';
+
     public $timestamps = false;
 
     protected $fillable = [
-        'email', 'email_otp', 'mobile', 'mobile_otp'
+        'name',
+        'token',
     ];
 }
